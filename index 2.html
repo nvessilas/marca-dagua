@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Marca D'Água">
+<meta name="theme-color" content="#0d0d1a">
+<title>Marca D'Água em Lote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --bg: #0d0d1a;
+    --surface: #13131f;
+    --surface2: #1a1a2e;
+    --accent: #ff3c5f;
+    --accent2: #ff7043;
+    --gold: #ffc947;
+    --fg: #f0f0f8;
+    --fg2: #7878a0;
+    --fg3: #3a3a5c;
+    --radius: 16px;
+    --shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0; opacity: 0.4;
+  }
+
+  /* Glow bg */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -200px; left: 50%; transform: translateX(-50%);
+    width: 600px; height: 400px;
+    background: radial-gradient(ellipse, rgba(255,60,95,0.08) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 0 16px 40px; }
+
+  /* Header */
+  header {
+    padding: 48px 0 32px;
+    text-align: center;
+  }
+  .logo-mark {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 0 40px rgba(255,60,95,0.3);
+  }
+  .logo-mark svg { width: 28px; height: 28px; }
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px; font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(90deg, var(--fg) 60%, var(--fg2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .subtitle { color: var(--fg2); font-size: 11px; margin-top: 6px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* Steps */
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--fg3);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 12px;
+    transition: border-color .2s;
+  }
+  .step.active { border-color: rgba(255,60,95,0.4); }
+  .step-header {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+  }
+  .step-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--fg3); color: var(--fg2);
+    font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: background .3s, color .3s;
+  }
+  .step.active .step-num { background: var(--accent); color: #fff; }
+  .step-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.3px; }
+
+  /* Drop zones */
+  .dropzone {
+    border: 2px dashed var(--fg3);
+    border-radius: 12px;
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    position: relative;
+  }
+  .dropzone:active, .dropzone.dragover { border-color: var(--accent); background: rgba(255,60,95,0.05); }
+  .dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .dropzone-icon { font-size: 32px; margin-bottom: 8px; }
+  .dropzone-label { color: var(--fg2); font-size: 12px; line-height: 1.5; }
+  .dropzone-label strong { color: var(--fg); }
+
+  /* Preview logo */
+  .logo-preview {
+    display: none; align-items: center; gap: 12px;
+    background: var(--surface2); border-radius: 10px; padding: 12px;
+    margin-top: 12px;
+  }
+  .logo-preview.show { display: flex; }
+  .logo-preview img { width: 48px; height: 48px; object-fit: contain; border-radius: 8px; background: #fff1; }
+  .logo-preview-info { flex: 1; min-width: 0; }
+  .logo-preview-name { font-size: 11px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .logo-preview-sub { font-size: 10px; color: var(--fg2); margin-top: 2px; }
+  .btn-clear { background: none; border: none; color: var(--fg2); font-size: 18px; cursor: pointer; padding: 4px; }
+
+  /* Image count badge */
+  .img-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,60,95,0.1); border: 1px solid rgba(255,60,95,0.3);
+    border-radius: 20px; padding: 6px 14px; margin-top: 12px;
+    font-size: 11px; color: var(--accent);
+  }
+  .img-badge.hidden { display: none; }
+
+  /* Controles */
+  .control { margin-bottom: 18px; }
+  .control:last-child { margin-bottom: 0; }
+  .control-label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: var(--fg2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .control-value { color: var(--gold); font-weight: 600; }
+
+  input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 4px;
+    background: var(--fg3); border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--accent); cursor: pointer;
+    box-shadow: 0 0 12px rgba(255,60,95,0.5);
+  }
+
+  /* Position grid */
+  .pos-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+    margin-top: 8px;
+  }
+  .pos-btn {
+    background: var(--surface2); border: 1px solid var(--fg3);
+    border-radius: 8px; padding: 10px 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--fg2); cursor: pointer; text-align: center;
+    transition: all .15s; line-height: 1.3;
+  }
+  .pos-btn:active { transform: scale(0.96); }
+  .pos-btn.selected { background: rgba(255,60,95,0.15); border-color: var(--accent); color: var(--accent); }
+  .pos-icon { font-size: 16px; display: block; margin-bottom: 2px; }
+
+  /* Canvas preview */
+  .preview-wrap {
+    background: var(--surface2);
+    border-radius: 12px; overflow: hidden;
+    position: relative;
+    aspect-ratio: 16/10;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .preview-placeholder {
+    text-align: center; color: var(--fg2); font-size: 11px; padding: 24px;
+    line-height: 1.6;
+  }
+  .preview-placeholder .ph-icon { font-size: 36px; margin-bottom: 8px; }
+  canvas#preview {
+    width: 100%; height: 100%; object-fit: contain;
+    display: none;
+  }
+  .preview-label {
+    font-size: 10px; color: var(--fg2); text-align: center;
+    margin-top: 8px; letter-spacing: 0.5px; text-transform: uppercase;
+  }
+
+  /* Process button */
+  .btn-process {
+    width: 100%; padding: 18px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; border-radius: var(--radius);
+    font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800;
+    color: #fff; cursor: pointer; letter-spacing: 0.5px;
+    box-shadow: 0 8px 32px rgba(255,60,95,0.35);
+    transition: transform .15s, box-shadow .15s;
+    position: relative; overflow: hidden;
+    margin-top: 12px;
+  }
+  .btn-process:active { transform: scale(0.98); box-shadow: 0 4px 16px rgba(255,60,95,0.2); }
+  .btn-process:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Progress */
+  .progress-wrap { display: none; margin-top: 12px; }
+  .progress-wrap.show { display: block; }
+  .progress-bar-bg {
+    height: 6px; background: var(--fg3); border-radius: 3px; overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 3px; width: 0%; transition: width .2s;
+  }
+  .progress-text { font-size: 11px; color: var(--fg2); margin-top: 8px; text-align: center; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--surface); border: 1px solid var(--fg3);
+    border-radius: 40px; padding: 12px 24px;
+    font-size: 12px; color: var(--fg); white-space: nowrap;
+    box-shadow: var(--shadow); z-index: 100;
+    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: rgba(76,175,130,0.5); color: #4caf82; }
+  .toast.error { border-color: rgba(255,60,95,0.5); color: var(--accent); }
+
+  /* Install banner */
+  .install-banner {
+    background: var(--surface2); border: 1px solid var(--fg3);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+    display: none;
+  }
+  .install-banner.show { display: block; }
+  .install-banner p { font-size: 11px; color: var(--fg2); line-height: 1.6; }
+  .install-banner strong { color: var(--fg); }
+  .btn-install {
+    margin-top: 10px; width: 100%; padding: 12px;
+    background: var(--surface); border: 1px solid var(--accent);
+    border-radius: 10px; color: var(--accent);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    cursor: pointer; font-weight: 600;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f5f5fa; --surface: #fff; --surface2: #f0f0f8; --fg: #0d0d1a; --fg2: #6060a0; --fg3: #d0d0e8; }
+    body::before { opacity: 0.08; }
+    body::after { background: radial-gradient(ellipse, rgba(255,60,95,0.05) 0%, transparent 70%); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">
+        <rect x="3" y="3" width="18" height="18" rx="3"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <path d="M21 15l-5-5L5 21"/>
+        <path d="M14 10l2 2"/>
+      </svg>
+    </div>
+    <h1>Marca D'Água</h1>
+    <p class="subtitle">Aplique sua logo em lote</p>
+  </header>
+
+  <!-- Install banner iOS -->
+  <div class="install-banner" id="installBanner">
+    <p>📱 <strong>Instalar como app:</strong> Toque em <strong>Compartilhar</strong> no Safari e depois em <strong>"Adicionar à Tela Início"</strong> para usar sem abrir o navegador.</p>
+  </div>
+
+  <!-- Step 1: Logo -->
+  <div class="step" id="step1">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <span class="step-title">Selecionar Logo</span>
+    </div>
+    <div class="dropzone" id="dropLogo">
+      <input type="file" id="inputLogo" accept="image/*">
+      <div class="dropzone-icon">🖼️</div>
+      <div class="dropzone-label"><strong>Toque para selecionar</strong><br>PNG com fundo transparente<br>é o ideal</div>
+    </div>
+    <div class="logo-preview" id="logoPreview">
+      <img id="logoThumb" src="" alt="logo">
+      <div class="logo-preview-info">
+        <div class="logo-preview-name" id="logoName">—</div>
+        <div class="logo-preview-sub" id="logoSub">—</div>
+      </div>
+      <button class="btn-clear" id="btnClearLogo">✕</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Images -->
+  <div class="step" id="step2">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <span class="step-title">Adicionar Imagens</span>
+    </div>
+    <div class="dropzone" id="dropImages">
+      <input type="file" id="inputImages" accept="image/*" multiple>
+      <div class="dropzone-icon">📁</div>
+      <div class="dropzone-label"><strong>Toque para selecionar</strong><br>Selecione quantas quiser</div>
+    </div>
+    <div class="img-badge hidden" id="imgBadge">
+      <span>📸</span> <span id="imgCount">0</span> imagem(ns) selecionada(s)
+      <button class="btn-clear" id="btnClearImages" style="font-size:14px;margin-left:4px">✕</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Settings -->
+  <div class="step" id="step3">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <span class="step-title">Configurar</span>
+    </div>
+
+    <div class="control">
+      <div class="control-label">Tamanho da logo <span class="control-value" id="valSize">20%</span></div>
+      <input type="range" id="slSize" min="5" max="60" value="20">
+    </div>
+    <div class="control">
+      <div class="control-label">Opacidade <span class="control-value" id="valOpacity">80%</span></div>
+      <input type="range" id="slOpacity" min="10" max="100" value="80">
+    </div>
+    <div class="control">
+      <div class="control-label">Margem (px) <span class="control-value" id="valMargin">10px</span></div>
+      <input type="range" id="slMargin" min="0" max="80" value="10">
+    </div>
+
+    <div class="control-label" style="margin-top:4px">Posição</div>
+    <div class="pos-grid" id="posGrid">
+      <button class="pos-btn" data-pos="tl"><span class="pos-icon">↖</span>Sup. Esq.</button>
+      <button class="pos-btn" data-pos="tc"><span class="pos-icon">↑</span>Sup. Centro</button>
+      <button class="pos-btn" data-pos="tr"><span class="pos-icon">↗</span>Sup. Dir.</button>
+      <button class="pos-btn" data-pos="ml"><span class="pos-icon">←</span>Meio Esq.</button>
+      <button class="pos-btn" data-pos="mc"><span class="pos-icon">·</span>Centro</button>
+      <button class="pos-btn" data-pos="mr"><span class="pos-icon">→</span>Meio Dir.</button>
+      <button class="pos-btn selected" data-pos="bl"><span class="pos-icon">↙</span>Inf. Esq.</button>
+      <button class="pos-btn" data-pos="bc"><span class="pos-icon">↓</span>Inf. Centro</button>
+      <button class="pos-btn" data-pos="br"><span class="pos-icon">↘</span>Inf. Dir.</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Preview -->
+  <div class="step" id="step4">
+    <div class="step-header">
+      <div class="step-num">4</div>
+      <span class="step-title">Preview</span>
+    </div>
+    <div class="preview-wrap">
+      <div class="preview-placeholder" id="previewPlaceholder">
+        <div class="ph-icon">👁️</div>
+        Selecione uma logo e pelo menos<br>uma imagem para ver o preview
+      </div>
+      <canvas id="preview"></canvas>
+    </div>
+    <p class="preview-label">Preview da primeira imagem</p>
+  </div>
+
+  <!-- Step 5: Process -->
+  <div class="step" id="step5">
+    <div class="step-header">
+      <div class="step-num">5</div>
+      <span class="step-title">Processar e Baixar</span>
+    </div>
+    <button class="btn-process" id="btnProcess">
+      🚀 Processar e Baixar ZIP
+    </button>
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="progress-text" id="progressText">Aguarde...</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Estado ────────────────────────────────────────────────────────────────────
+const state = {
+  logo: null,      // { file, img, url }
+  images: [],      // [{ file, img }]
+  position: 'bl',
+  size: 20,
+  opacity: 80,
+  margin: 10,
+};
+
+// ── Refs ──────────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const inputLogo    = $('inputLogo');
+const inputImages  = $('inputImages');
+const logoPreview  = $('logoPreview');
+const logoThumb    = $('logoThumb');
+const logoName     = $('logoName');
+const logoSub      = $('logoSub');
+const imgBadge     = $('imgBadge');
+const imgCount     = $('imgCount');
+const slSize       = $('slSize');
+const slOpacity    = $('slOpacity');
+const slMargin     = $('slMargin');
+const valSize      = $('valSize');
+const valOpacity   = $('valOpacity');
+const valMargin    = $('valMargin');
+const previewCanvas = $('preview');
+const previewPlaceholder = $('previewPlaceholder');
+const btnProcess   = $('btnProcess');
+const progressWrap = $('progressWrap');
+const progressBar  = $('progressBar');
+const progressText = $('progressText');
+const ctx          = previewCanvas.getContext('2d');
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg, type='') {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ── Carregar imagem de um File ────────────────────────────────────────────────
+function loadImg(file) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => res({ file, img, url });
+    img.onerror = rej;
+    img.src = url;
+  });
+}
+
+// ── Logo ──────────────────────────────────────────────────────────────────────
+inputLogo.addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const data = await loadImg(file);
+  state.logo = data;
+  logoThumb.src = data.url;
+  logoName.textContent = file.name;
+  logoSub.textContent = `${data.img.naturalWidth}×${data.img.naturalHeight}px`;
+  logoPreview.classList.add('show');
+  $('step1').classList.add('active');
+  updatePreview();
+});
+
+$('btnClearLogo').addEventListener('click', () => {
+  state.logo = null;
+  inputLogo.value = '';
+  logoPreview.classList.remove('show');
+  $('step1').classList.remove('active');
+  updatePreview();
+});
+
+// ── Imagens ───────────────────────────────────────────────────────────────────
+inputImages.addEventListener('change', async e => {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  toast('Carregando imagens...');
+  const loaded = await Promise.all(files.map(loadImg));
+  state.images = loaded;
+  imgCount.textContent = loaded.length;
+  imgBadge.classList.remove('hidden');
+  $('step2').classList.add('active');
+  updatePreview();
+  toast(`${loaded.length} imagem(ns) carregada(s) ✓`, 'success');
+});
+
+$('btnClearImages').addEventListener('click', () => {
+  state.images = [];
+  inputImages.value = '';
+  imgBadge.classList.add('hidden');
+  $('step2').classList.remove('active');
+  updatePreview();
+});
+
+// ── Sliders ───────────────────────────────────────────────────────────────────
+slSize.addEventListener('input', () => { state.size = +slSize.value; valSize.textContent = state.size + '%'; updatePreview(); });
+slOpacity.addEventListener('input', () => { state.opacity = +slOpacity.value; valOpacity.textContent = state.opacity + '%'; updatePreview(); });
+slMargin.addEventListener('input', () => { state.margin = +slMargin.value; valMargin.textContent = state.margin + 'px'; updatePreview(); });
+
+// ── Posição ───────────────────────────────────────────────────────────────────
+document.querySelectorAll('.pos-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    state.position = btn.dataset.pos;
+    updatePreview();
+  });
+});
+
+// ── Composição ────────────────────────────────────────────────────────────────
+function compose(destCanvas, baseImg, logoImg, sizePct, opacityPct, margin, pos) {
+  const W = baseImg.naturalWidth, H = baseImg.naturalHeight;
+  destCanvas.width = W; destCanvas.height = H;
+  const c = destCanvas.getContext('2d');
+  c.clearRect(0, 0, W, H);
+  c.drawImage(baseImg, 0, 0, W, H);
+
+  const lw = Math.round(W * sizePct / 100);
+  const lh = Math.round(logoImg.naturalHeight * lw / logoImg.naturalWidth);
+  const mg = margin;
+
+  let x, y;
+  const hx = pos[1]; // l, c, r
+  const vy = pos[0]; // t, m, b
+
+  x = hx === 'l' ? mg : hx === 'r' ? W - lw - mg : (W - lw) / 2;
+  y = vy === 't' ? mg : vy === 'b' ? H - lh - mg : (H - lh) / 2;
+
+  c.globalAlpha = opacityPct / 100;
+  c.drawImage(logoImg, x, y, lw, lh);
+  c.globalAlpha = 1;
+}
+
+// ── Preview ───────────────────────────────────────────────────────────────────
+function updatePreview() {
+  if (!state.logo || !state.images.length) {
+    previewCanvas.style.display = 'none';
+    previewPlaceholder.style.display = 'block';
+    return;
+  }
+  previewPlaceholder.style.display = 'none';
+  previewCanvas.style.display = 'block';
+
+  compose(previewCanvas,
+    state.images[0].img, state.logo.img,
+    state.size, state.opacity, state.margin, state.position);
+}
+
+// ── Processar e gerar ZIP ─────────────────────────────────────────────────────
+btnProcess.addEventListener('click', async () => {
+  if (!state.logo) { toast('Selecione a logo primeiro!', 'error'); return; }
+  if (!state.images.length) { toast('Adicione pelo menos uma imagem!', 'error'); return; }
+
+  btnProcess.disabled = true;
+  progressWrap.classList.add('show');
+
+  const zip = new JSZip();
+  const offscreen = document.createElement('canvas');
+  const total = state.images.length;
+
+  for (let i = 0; i < total; i++) {
+    const { file, img } = state.images[i];
+
+    // Aguarda imagem carregar completamente antes de compor
+    await new Promise(r => {
+      if (img.complete) return r();
+      img.onload = r;
+    });
+
+    compose(offscreen, img, state.logo.img,
+      state.size, state.opacity, state.margin, state.position);
+
+    // Aguarda o canvas terminar de renderizar
+    await new Promise(r => setTimeout(r, 50));
+
+    const blob = await new Promise((res, rej) => {
+      offscreen.toBlob(b => {
+        if (b) res(b);
+        else rej(new Error('toBlob falhou'));
+      }, 'image/png');
+    });
+
+    const name = file.name.replace(/\.[^.]+$/, '') + '_logo.png';
+    zip.file(name, blob);
+
+    const pct = Math.round((i + 1) / total * 100);
+    progressBar.style.width = pct + '%';
+    progressText.textContent = `Processando ${i + 1} de ${total}...`;
+
+    // Yield para atualizar a UI
+    await new Promise(r => setTimeout(r, 10));
+  }
+
+  progressText.textContent = 'Gerando ZIP...';
+  const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+
+  const url = URL.createObjectURL(zipBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'imagens_com_logo.zip';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+  progressWrap.classList.remove('show');
+  progressBar.style.width = '0%';
+  btnProcess.disabled = false;
+  toast(`✅ ${total} imagem(ns) processada(s)! ZIP baixado.`, 'success');
+});
+
+// ── iOS install hint ──────────────────────────────────────────────────────────
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone;
+if (isIOS) $('installBanner').classList.add('show');
+</script>
+</body>
+</html>
